@@ -1,0 +1,24 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: ai-companion-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root-password-for-learning-only
+      MYSQL_DATABASE: ai_companion
+      MYSQL_USER: companion
+      MYSQL_PASSWORD: companion-password
+    ports:
+      - "3306:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - companion-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot-password-for-learning-only"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  companion-mysql-data:

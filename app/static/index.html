@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>小伴 · AI 智能伴侣 Starter</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f7f4ee;
+      --ink: #25312d;
+      --muted: #6c7974;
+      --accent: #436c5d;
+      --accent-soft: #dce9e2;
+      --line: #d8ddd8;
+      --white: #fffefa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 10% 0%, #e8eee8 0, transparent 35%),
+        linear-gradient(145deg, #f9f6f0, #edf3ef);
+      color: var(--ink);
+      font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    .shell {
+      width: min(880px, calc(100% - 28px));
+      height: min(820px, calc(100vh - 36px));
+      margin: 18px auto;
+      display: grid;
+      grid-template-rows: auto 1fr auto auto;
+      background: rgb(255 254 250 / 92%);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: 0 20px 70px rgb(54 76 66 / 14%);
+      overflow: hidden;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    .avatar {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      font-size: 20px;
+    }
+    h1 { margin: 0; font-size: 18px; }
+    .sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .status {
+      margin-left: auto;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+    #messages {
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+    }
+    .empty {
+      margin: auto;
+      max-width: 460px;
+      text-align: center;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+    .bubble {
+      max-width: 78%;
+      padding: 12px 15px;
+      border-radius: 17px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      font-size: 15px;
+    }
+    .user {
+      align-self: flex-end;
+      color: white;
+      background: var(--accent);
+      border-bottom-right-radius: 5px;
+    }
+    .assistant {
+      align-self: flex-start;
+      background: #edf2ee;
+      border-bottom-left-radius: 5px;
+    }
+    .safety {
+      border: 1px solid #d9b9a9;
+      background: #fff3ec;
+    }
+    form {
+      display: flex;
+      gap: 10px;
+      padding: 14px 18px 6px;
+      border-top: 1px solid var(--line);
+    }
+    textarea {
+      flex: 1;
+      resize: none;
+      min-height: 50px;
+      max-height: 130px;
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      outline: none;
+      font: inherit;
+      background: white;
+    }
+    textarea:focus { border-color: var(--accent); }
+    button {
+      width: 78px;
+      border: 0;
+      border-radius: 14px;
+      background: var(--accent);
+      color: white;
+      font: inherit;
+      cursor: pointer;
+    }
+    button:disabled { cursor: wait; opacity: .55; }
+    .note {
+      padding: 2px 22px 14px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    @media (max-width: 600px) {
+      .shell {
+        width: 100%;
+        height: 100vh;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+      }
+      #messages { padding: 18px 14px; }
+      .bubble { max-width: 88%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="avatar">伴</div>
+      <div>
+        <h1>小伴</h1>
+        <div class="sub">一个会记住当前对话的 AI 陪伴助手</div>
+      </div>
+      <div class="status" id="status">正在连接</div>
+    </header>
+    <section id="messages" aria-live="polite">
+      <div class="empty" id="empty">
+        你好，我是小伴。<br>
+        这是一段保存在你本地数据库中的对话。<br>
+        今天想聊点什么？
+      </div>
+    </section>
+    <form id="chat-form">
+      <textarea id="message" maxlength="4000" placeholder="说说你现在想聊的事……" required></textarea>
+      <button id="send" type="submit">发送</button>
+    </form>
+    <div class="note">AI 不是人类，也不能替代医生或紧急服务。请勿输入身份证号、密码等敏感信息。</div>
+  </main>
+  <script>
+    const form = document.querySelector("#chat-form");
+    const input = document.querySelector("#message");
+    const send = document.querySelector("#send");
+    const messages = document.querySelector("#messages");
+    const empty = document.querySelector("#empty");
+    const statusEl = document.querySelector("#status");
+    let conversationId = null;
+
+    function addBubble(content, role, safety = false) {
+      if (empty) empty.remove();
+      const bubble = document.createElement("div");
+      bubble.className = `bubble ${role}${safety ? " safety" : ""}`;
+      bubble.textContent = content;
+      messages.appendChild(bubble);
+      messages.scrollTop = messages.scrollHeight;
+      return bubble;
+    }
+
+    async function loadHealth() {
+      try {
+        const response = await fetch("/health");
+        const data = await response.json();
+        statusEl.textContent = data.llm_mode === "mock" ? "模拟模式" : "DeepSeek 已连接";
+      } catch {
+        statusEl.textContent = "连接失败";
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const content = input.value.trim();
+      if (!content) return;
+
+      addBubble(content, "user");
+      input.value = "";
+      input.style.height = "";
+      send.disabled = true;
+      const waiting = addBubble("正在想一想……", "assistant");
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: content,
+            conversation_id: conversationId
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "请求失败");
+
+        conversationId = data.conversation_id;
+        waiting.textContent = data.reply;
+        if (data.safety_triggered) waiting.classList.add("safety");
+      } catch (error) {
+        waiting.textContent = `发送失败：${error.message}`;
+      } finally {
+        send.disabled = false;
+        input.focus();
+      }
+    });
+
+    input.addEventListener("input", () => {
+      input.style.height = "auto";
+      input.style.height = `${Math.min(input.scrollHeight, 130)}px`;
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    loadHealth();
+  </script>
+</body>
+</html>
